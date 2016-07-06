@@ -127,13 +127,13 @@ type Light struct {
 }
 
 // Verify checks whether the block's nonce is valid.
-func (l *Light) Verify(block pow.Block) bool {
+func (l *Light) Verify(block pow.Block, shareDifficulty *big.Int, blockDifficulty *big.Int) (bool, bool) {
 	// TODO: do ethash_quick_verify before getCache in order
 	// to prevent DOS attacks.
 	blockNum := block.NumberU64()
 	if blockNum >= epochLength*2048 {
 		glog.V(logger.Debug).Infof("block number %d too high, limit is %d", epochLength*2048)
-		return false
+		return false, false
 	}
 
 	difficulty := block.Difficulty()
@@ -142,9 +142,13 @@ func (l *Light) Verify(block pow.Block) bool {
 		 We could check the minimum valid difficulty but for SoC we avoid (duplicating)
 	   Ethereum protocol consensus rules here which are not in scope of Ethash
 	*/
-	if difficulty.Cmp(common.Big0) == 0 {
+	if blockDifficulty.Cmp(common.Big0) == 0 {
 		glog.V(logger.Debug).Infof("invalid block difficulty")
-		return false
+		return false, false
+	}
+	if shareDifficulty.Cmp(common.Big0) == 0 {
+		glog.V(logger.Debug).Infof("invalid share difficulty")
+		return false, false
 	}
 
 	cache := l.getCache(blockNum)
@@ -155,17 +159,19 @@ func (l *Light) Verify(block pow.Block) bool {
 	// Recompute the hash using the cache.
 	ok, mixDigest, result := cache.compute(uint64(dagSize), block.HashNoNonce(), block.Nonce())
 	if !ok {
-		return false
+		return false, false
 	}
 
 	// avoid mixdigest malleability as it's not included in a block's "hashNononce"
 	if block.MixDigest() != mixDigest {
-		return false
+		return false, false
 	}
 
 	// The actual check.
-	target := new(big.Int).Div(maxUint256, difficulty)
-	return result.Big().Cmp(target) <= 0
+	shareTarget := new(big.Int).Div(maxUint256, shareDifficulty)
+	blockTarget := new(big.Int).Div(maxUint256, blockDifficulty)
+	
+	return result.Big().Cmp(shareTarget) <= 0, result.Big().Cmp(blockTarget) <= 0
 }
 
 func h256ToHash(in C.ethash_h256_t) common.Hash {
