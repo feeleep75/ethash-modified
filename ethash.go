@@ -136,7 +136,6 @@ func (l *Light) Verify(block pow.Block, shareDifficulty *big.Int, blockDifficult
 		return false, false
 	}
 
-	difficulty := block.Difficulty()
 	/* Cannot happen if block header diff is validated prior to PoW, but can
 		 happen if PoW is checked first due to parallel PoW checking.
 		 We could check the minimum valid difficulty but for SoC we avoid (duplicating)
