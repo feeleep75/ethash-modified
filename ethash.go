@@ -124,6 +124,13 @@ type Light struct {
 	NumCaches int // Maximum number of caches to keep before eviction (only init, don't modify)
 }
 
+func (l *Light) computeMixDigest(blockNum uint64, hashNoNonce common.Hash, nonce uint64) (mixDigest common.Hash) {
+    cache := l.getCache(blockNum)
+    dagSize := C.ethash_get_datasize(C.uint64_t(blockNum))
+    _, md, _ := cache.compute(uint64(dagSize), hashNoNonce, nonce)
+    return md
+}
+
 // Verify checks whether the block's nonce is valid.
 func (l *Light) Verify(block Block, shareDifficulty *big.Int, blockDifficulty *big.Int) (bool, bool) {
 	// TODO: do ethash_quick_verify before getCache in order
